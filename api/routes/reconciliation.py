@@ -18,18 +18,26 @@ router = APIRouter()
 @router.post("/upload")
 async def upload_invoice(
     file: Optional[UploadFile] = File(None),
-    payload: Optional[dict] = Body(None)
+    payload: Optional[str] = Body(None)
 ):
     """
     Ingest invoice via file upload or JSON payload.
     """
     invoice_id = str(uuid.uuid4())
     
+    parsed_payload = None
+    if payload:
+        try:
+            import json
+            parsed_payload = json.loads(payload)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON in payload field")
+    
     if file:
         content = await file.read()
         storage_service.save_invoice(invoice_id, {"content": content, "is_file": True, "filename": file.filename})
-    elif payload:
-        storage_service.save_invoice(invoice_id, {"content": payload, "is_file": False})
+    elif parsed_payload:
+        storage_service.save_invoice(invoice_id, {"content": parsed_payload, "is_file": False})
     else:
         raise HTTPException(status_code=400, detail="Either file or JSON payload must be provided")
     
