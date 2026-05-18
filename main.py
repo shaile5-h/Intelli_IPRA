@@ -1,6 +1,9 @@
 import time
 import logging
+import os
 from fastapi import FastAPI, Request
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from api.routes.reconciliation import router as reconciliation_router
 
 # Configure logging
@@ -27,9 +30,17 @@ async def log_requests(request: Request, call_next):
 # Include routes
 app.include_router(reconciliation_router, prefix="/api/v1")
 
+# Ensure frontend directory exists
+FRONTEND_PATH = os.path.join(os.path.dirname(__file__), "frontend")
+if not os.path.exists(FRONTEND_PATH):
+    os.makedirs(FRONTEND_PATH)
+
 @app.get("/")
 async def root():
-    return {"message": "Welcome to FinFlow Intelligent Invoice Processing & Reconciliation Agent API"}
+    index_path = os.path.join(FRONTEND_PATH, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return {"message": "Welcome to FinFlow Intelligent Invoice Processing & Reconciliation Agent API. Frontend not found at /frontend/index.html"}
 
 if __name__ == "__main__":
     import uvicorn

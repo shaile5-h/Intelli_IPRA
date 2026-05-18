@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinFlow IPRA - Intelligent Invoice Processing</title>
+    <!-- React, ReactDOM, and Babel via CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function App() {
+            const [file, setFile] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [report, setReport] = useState(null);
+            const [error, setError] = useState(null);
+
+            const handleFileChange = (e) => {
+                setFile(e.target.files[0]);
+            };
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (!file) return;
+
+                setLoading(true);
+                setReport(null);
+                setError(null);
+
+                try {
+                    // 1. Upload Invoice
+                    const formData = new FormData();
+                    formData.append('file', file);
+
+                    const uploadRes = await fetch('/api/v1/upload', {
+                        method: 'POST',
+                        body: formData,
+                    });
+
+                    if (!uploadRes.ok) throw new Error('Upload failed');
+                    const uploadData = await uploadRes.json();
+                    const invoiceId = uploadData.invoice_id;
+
+                    // 2. Trigger Reconciliation
+                    const reconcileRes = await fetch(`/api/v1/reconcile/${invoiceId}`, {
+                        method: 'POST',
+                    });
+
+                    if (!reconcileRes.ok) throw new Error('Reconciliation failed');
+                    const reportData = await reconcileRes.json();
+                    setReport(reportData);
+                } catch (err) {
+                    setError(err.message);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="max-w-5xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+                    <header className="mb-12 text-center">
+                        <h1 className="text-4xl font-extrabold text-indigo-700 tracking-tight">FinFlow IPRA</h1>
+                        <p className="mt-2 text-lg text-gray-600">Intelligent Invoice Processing & Reconciliation Agent</p>
+                    </header>
+
+                    <div className="bg-white shadow-xl rounded-2xl overflow-hidden mb-8">
+                        <div className="p-8">
+                            <h2 className="text-2xl font-bold text-gray-900 mb-6">Process New Invoice</h2>
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-12 text-center hover:border-indigo-400 transition-colors">
+                                    <input 
+                                        type="file" 
+                                        id="invoice-upload"
+                                        className="hidden" 
+                                        onChange={handleFileChange}
+                                        accept=".pdf,.png,.jpg,.jpeg"
+                                    />
+                                    <label htmlFor="invoice-upload" className="cursor-pointer">
+                                        <div className="flex flex-col items-center">
+                                            <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                            </svg>
+                                            <span className="text-gray-600 font-medium">
+                                                {file ? file.name : "Click to select or drag and drop invoice"}
+                                            </span>
+                                            <span className="text-sm text-gray-400 mt-1">PDF, PNG, JPG (Max 5MB)</span>
+                                        </div>
+                                    </label>
+                                </div>
+                                <button 
+                                    type="submit" 
+                                    disabled={!file || loading}
+                                    className={`w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-lg font-medium text-white ${!file || loading ? 'bg-indigo-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all`}
+                                >
+                                    {loading ? (
+                                        <div className="flex items-center">
+                                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Processing with AI...
+                                        </div>
+                                    ) : "Reconcile Invoice"}
+                                </button>
+                            </form>
+                            {error && (
+                                <div className="mt-4 p-4 bg-red-50 border-l-4 border-red-400 text-red-700 rounded">
+                                    <p className="font-bold">Error</p>
+                                    <p>{error}</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {report && <ReportView report={report} />}
+                </div>
+            );
+        }
+
+        function ReportView({ report }) {
+            const getStatusColor = (status) => {
+                switch (status) {
+                    case 'MATCHED': return 'bg-green-100 text-green-800';
+                    case 'PARTIAL': return 'bg-yellow-100 text-yellow-800';
+                    case 'FAILED': return 'bg-red-100 text-red-800';
+                    default: return 'bg-gray-100 text-gray-800';
+                }
+            };
+
+            return (
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="bg-white shadow rounded-2xl p-8">
+                        <div className="flex justify-between items-center mb-8">
+                            <h2 className="text-2xl font-bold text-gray-900">Reconciliation Report</h2>
+                            <span className={`px-4 py-1.5 rounded-full text-sm font-bold tracking-wide uppercase ${getStatusColor(report.reconciliation_status)}`}>
+                                {report.reconciliation_status}
+                            </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <section>
+                                <h3 className="text-lg font-semibold text-gray-700 mb-4 border-b pb-2">Extracted Invoice Data</h3>
+                                {report.extracted_data ? (
+                                    <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                                        <dt className="text-gray-500">Vendor:</dt>
+                                        <dd className="font-medium text-gray-900">{report.extracted_data.vendor_name}</dd>
+                                        <dt className="text-gray-500">Invoice #:</dt>
+                                        <dd className="font-medium text-gray-900">{report.extracted_data.invoice_number}</dd>
+                                        <dt className="text-gray-500">Date:</dt>
+                                        <dd className="font-medium text-gray-900">{report.extracted_data.invoice_date}</dd>
+                                        <dt className="text-gray-500">Amount:</dt>
+                                        <dd className="font-medium text-gray-900">{report.extracted_data.total_amount} {report.extracted_data.currency}</dd>
+                                        <dt className="text-gray-500">PO Ref:</dt>
+                                        <dd className="font-medium text-indigo-600 font-bold">{report.extracted_data.po_reference || 'N/A'}</dd>
+                                    </dl>
+                                ) : <p className="text-red-500">Failed to extract data.</p>}
+                            </section>
+
+                            <section>
+                                <h3 className="text-lg font-semibold text-gray-700 mb-4 border-b pb-2">Matched Purchase Order</h3>
+                                {report.matched_po ? (
+                                    <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                                        <dt className="text-gray-500">PO #:</dt>
+                                        <dd className="font-medium text-gray-900">{report.matched_po.po_number}</dd>
+                                        <dt className="text-gray-500">Vendor:</dt>
+                                        <dd className="font-medium text-gray-900">{report.matched_po.vendor_name}</dd>
+                                        <dt className="text-gray-500">Amount:</dt>
+                                        <dd className="font-medium text-gray-900">{report.matched_po.total_amount} {report.matched_po.currency}</dd>
+                                        <dt className="text-gray-500">Status:</dt>
+                                        <dd className="font-medium text-gray-900">{report.matched_po.status}</dd>
+                                    </dl>
+                                ) : <p className="text-gray-500 italic">No matching PO found in system.</p>}
+                            </section>
+                        </div>
+
+                        {report.extracted_data && report.extracted_data.line_items.length > 0 && (
+                            <div className="mt-8">
+                                <h3 className="text-lg font-semibold text-gray-700 mb-4 border-b pb-2">Line Items</h3>
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-gray-200">
+                                        <thead className="bg-gray-50">
+                                            <tr>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
+                                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="bg-white divide-y divide-gray-200 text-sm">
+                                            {report.extracted_data.line_items.map((item, idx) => (
+                                                <tr key={idx}>
+                                                    <td className="px-6 py-4 whitespace-nowrap">{item.description}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">{item.qty}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">{item.unit_price}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap font-medium">{(item.qty * item.unit_price).toFixed(2)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="bg-white shadow rounded-2xl p-8">
+                            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                                <svg className={`w-6 h-6 mr-2 ${report.validation_status.is_valid ? 'text-green-500' : 'text-red-500'}`} fill="currentColor" viewBox="0 0 20 20">
+                                    {report.validation_status.is_valid 
+                                        ? <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                        : <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                    }
+                                </svg>
+                                Validation Results
+                            </h3>
+                            {report.validation_status.errors.length > 0 ? (
+                                <ul className="list-disc list-inside text-sm text-red-600 space-y-1">
+                                    {report.validation_status.errors.map((err, idx) => <li key={idx}>{err}</li>)}
+                                </ul>
+                            ) : <p className="text-sm text-green-600 font-medium">All validation rules passed.</p>}
+                        </div>
+
+                        <div className="bg-white shadow rounded-2xl p-8">
+                            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                                <svg className={`w-6 h-6 mr-2 ${report.anomalies.length === 0 ? 'text-green-500' : 'text-orange-500'}`} fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                                Business Anomalies
+                            </h3>
+                            {report.anomalies.length > 0 ? (
+                                <div className="space-y-4">
+                                    {report.anomalies.map((anomaly, idx) => (
+                                        <div key={idx} className="p-3 bg-orange-50 border-l-4 border-orange-400">
+                                            <p className="text-xs font-bold text-orange-800 uppercase tracking-tight">{anomaly.type}</p>
+                                            <p className="text-sm text-orange-700">{anomaly.message}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : <p className="text-sm text-green-600 font-medium">No business anomalies detected.</p>}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
