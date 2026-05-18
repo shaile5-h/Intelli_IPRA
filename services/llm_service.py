@@ -44,14 +44,20 @@ class LLMService:
             if is_file:
                 import mimetypes
                 mime_type = mimetypes.guess_type(filename)[0] if filename else "application/pdf"
-                if not mime_type:
-                    mime_type = "application/pdf"
-
-                # Use a list for multi-modal input
-                response = self.model.generate_content([
-                    prompt,
-                    {"mime_type": mime_type, "data": content}
-                ])
+                
+                # If it's a text-based file, read it as a string instead of a multi-modal blob
+                if mime_type and (mime_type.startswith("text/") or mime_type == "application/json"):
+                    text_content = content.decode("utf-8", errors="ignore")
+                    response = self.model.generate_content(f"{prompt}\n\nInvoice Content (from {filename}):\n{text_content}")
+                else:
+                    if not mime_type:
+                        mime_type = "application/pdf"
+                    
+                    # Use a list for multi-modal input
+                    response = self.model.generate_content([
+                        prompt,
+                        {"mime_type": mime_type, "data": content}
+                    ])
             else:
                 if isinstance(content, dict):
                     content = json.dumps(content, indent=2)

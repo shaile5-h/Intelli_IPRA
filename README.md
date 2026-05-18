@@ -2,18 +2,24 @@
 > Intelligent Invoice Processing & Reconciliation Agent
 
 ## 🚀 Project Overview
-FinFlow Intelligent IPRA is an automated accounts-payable solution designed to streamline invoice processing. It leverages the **Gemini 1.5 Flash LLM** to extract data from invoices (PDFs, images, or JSON), validates the data against business rules, matches it with Purchase Orders (POs), and detects anomalies like price variances or duplicate submissions.
+FinFlow Intelligent IPRA is an automated accounts-payable solution designed to streamline invoice processing. It leverages the **Gemini 2.0 Flash Lite LLM** to extract data from invoices, validates the data against business rules, matches it with Purchase Orders (POs), and detects anomalies.
+
+### 🌐 Web Interface
+The project now includes a **React-based Web Frontend** for easy interaction. 
+- **Access the UI**: Open your browser and go to **`http://localhost:8000/`**
+- **Supported File Formats**: PDF, PNG, JPG, JPEG, JSON, and TXT.
 
 ## ✨ Key Features
-- **Intelligent Extraction**: Uses Gemini AI to parse structured data from unstructured invoice files.
+- **Intelligent Extraction**: Uses Gemini AI to parse structured data from both images/PDFs and text-based formats (JSON/TXT).
+- **Interactive UI**: Drag-and-drop web interface for instant invoice processing and report viewing.
 - **PO Matching**: Automatically reconciles invoices against a mock Purchase Order database.
 - **Anomaly Detection**: Flags variances > 5%, missing PO references, and duplicate invoices.
 - **RESTful API**: Built with FastAPI for high performance and easy integration.
-- **In-Memory Storage**: Fast session-based processing for reconciliation reports.
 
 ## 🏗️ Architecture
 The project follows a modular service-oriented architecture:
 - `api/`: REST API routes and endpoint logic.
+- `frontend/`: React-based web interface (`index.html`).
 - `models/`: Pydantic schemas for data validation and type safety.
 - `services/`: Business logic (LLM integration, Validation, PO Matching, Anomaly Detection).
 - `storage/`: Data persistence layer (currently in-memory).
@@ -58,6 +64,17 @@ python server.py
 The API will be available at: `http://localhost:8000`
 - **Swagger Documentation**: `http://localhost:8000/docs`
 - **ReDoc**: `http://localhost:8000/redoc`
+
+## 🧪 Running Tests
+The project uses `pytest` for automated testing. To run the test suite:
+
+```bash
+# Ensure test dependencies are installed
+pip install pytest pytest-asyncio httpx
+
+# Run all tests
+python -m pytest tests/
+```
 
 ## 📡 API Endpoints
 - `POST /api/v1/upload`: Upload an invoice (File or JSON).
