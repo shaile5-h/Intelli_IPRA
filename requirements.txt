@@ -3,4 +3,5 @@ uvicorn
 pydantic>=2.0.0
 python-multipart
 google-generativeai
+google.genai
 python-dotenv

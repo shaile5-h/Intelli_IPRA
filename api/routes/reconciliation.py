@@ -25,19 +25,16 @@ async def upload_invoice(
     """
     invoice_id = str(uuid.uuid4())
     
-    parsed_payload = None
-    if payload:
-        try:
-            import json
-            parsed_payload = json.loads(payload)
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid JSON in payload field")
-    
     if file:
         content = await file.read()
         storage_service.save_invoice(invoice_id, {"content": content, "is_file": True, "filename": file.filename})
-    elif parsed_payload:
-        storage_service.save_invoice(invoice_id, {"content": parsed_payload, "is_file": False})
+    elif payload:
+        try:
+            import json
+            parsed_payload = json.loads(payload)
+            storage_service.save_invoice(invoice_id, {"content": parsed_payload, "is_file": False})
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON in payload field")
     else:
         raise HTTPException(status_code=400, detail="Either file or JSON payload must be provided")
     
@@ -55,7 +52,8 @@ async def reconcile_invoice(invoice_id: str):
     # 1. Extraction
     extracted_data = await llm_service.extract_invoice_data(
         invoice_data["content"], 
-        is_file=invoice_data["is_file"]
+        is_file=invoice_data["is_file"],
+        filename=invoice_data.get("filename")
     )
     
     if not extracted_data:
